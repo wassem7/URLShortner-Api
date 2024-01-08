@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace URLShortner.Models;
+namespace URLShortner.Models.DomainModels;
 
 public class ApiResponse
 {

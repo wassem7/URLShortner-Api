@@ -3,15 +3,15 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using URLShortner.Data;
 using URLShortner.Models;
+using URLShortner.Models.DomainModels;
 using URLShortner.Models.Dtos;
-using URLShortner.Models.Dtos.SubscriptionDtos;
 using URLShortner.Repository;
+using URLShortner.Services;
 
 namespace URLShortner.Controllers;
 
@@ -25,16 +25,22 @@ public class UrlShortnerController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IUrlRepository _urlRepository;
     private ApiResponse _apiResponse;
+    private readonly IMaxUrlCacheService _maxUrlCacheService;
 
-    public UrlShortnerController(ApplicationDbContext db, IUrlRepository urlRepository)
+    public UrlShortnerController(
+        ApplicationDbContext db,
+        IUrlRepository urlRepository,
+        IMaxUrlCacheService maxUrlCacheService
+    )
     {
         _db = db;
         _urlRepository = urlRepository;
         _apiResponse = new ApiResponse();
+        _maxUrlCacheService = maxUrlCacheService;
     }
 
     /// <summary>
-    /// Create shortened url [AUTHENTICATED]
+    /// Create shortened url [SECURED]
     /// </summary>
 
     [HttpPost("createshorturl")]
@@ -70,6 +76,34 @@ public class UrlShortnerController : ControllerBase
 
             var userId = claims.FirstOrDefault(c => c.Type == "Id").Value;
 
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == new Guid(userId));
+
+            var subscription = await _db.SubscriptionPackages.FirstOrDefaultAsync(
+                s => s.Id == user.SubscriptionId
+            );
+            var key = $"user:{user.Username}:{user.Subscription}";
+
+            var urlcount = await _maxUrlCacheService.GetMaxUrls(key);
+
+            if (urlcount == null)
+            {
+                _maxUrlCacheService.SetMaxUrls(key, subscription.MaxUrls);
+            }
+            else if (urlcount != null)
+            {
+                if (Int32.Parse(urlcount.ToString()) == 0)
+                {
+                    _apiResponse.HttpStatusCode = HttpStatusCode.BadRequest;
+                    _apiResponse.ErrorMessages = new List<string>()
+                    {
+                        "Maximum daily short URL generation quota reached.",
+                    };
+
+                    return Ok(_apiResponse);
+                }
+                _maxUrlCacheService.DecreaseUrlCount(key);
+            }
+
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
             var random = new Random();
@@ -96,13 +130,13 @@ public class UrlShortnerController : ControllerBase
         catch (Exception ex)
         {
             _apiResponse.HttpStatusCode = HttpStatusCode.BadRequest;
-            _apiResponse.ErrorMessages = new List<string>() { ex.Message.ToString() };
+            _apiResponse.ErrorMessages = new List<string>() { ex.Message.ToString(), };
             return BadRequest(_apiResponse);
         }
     }
 
     /// <summary>
-    /// Get all user's shortened urls [AUTHENTICATED]
+    /// Get all user's shortened urls [SECURED]
     /// </summary>
     [HttpGet(Name = "getallusershortenurls")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -164,7 +198,4 @@ public class UrlShortnerController : ControllerBase
             return BadRequest(_apiResponse);
         }
     }
-
-
-    
 }

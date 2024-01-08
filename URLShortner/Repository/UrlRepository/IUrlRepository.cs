@@ -1,4 +1,4 @@
-﻿using URLShortner.Models;
+﻿using URLShortner.Models.DomainModels;
 
 namespace URLShortner.Repository;
 

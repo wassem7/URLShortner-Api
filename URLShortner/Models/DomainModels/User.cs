@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLShortner.Models;
+namespace URLShortner.Models.DomainModels;
 
 public class User
 {

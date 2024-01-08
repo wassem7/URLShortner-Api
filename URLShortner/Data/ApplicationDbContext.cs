@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using URLShortner.Models;
+using URLShortner.Models.DomainModels;
 
 namespace URLShortner.Data;
 

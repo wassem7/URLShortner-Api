@@ -9,17 +9,15 @@ using Microsoft.OpenApi.Models;
 using URLShortner.Data;
 using URLShortner.Repository;
 using URLShortner.Repository.UserRepository;
+using URLShortner.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-// var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
 
 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.XML";
 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
 
 // Add services to the container.
-
+builder.Services.AddScoped<IMaxUrlCacheService, MaxUrlsCacheService>();
 builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddResponseCaching();
 builder.Services.AddScoped<IUrlRepository, UrlRepository>();

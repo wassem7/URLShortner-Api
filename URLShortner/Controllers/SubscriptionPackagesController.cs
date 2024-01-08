@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using URLShortner.Data;
 using URLShortner.Models;
+using URLShortner.Models.DomainModels;
 using URLShortner.Models.Dtos.SubscriptionDtos;
 
 namespace URLShortner.Controllers;
@@ -102,7 +103,7 @@ public class SubscriptionPackagesController : ControllerBase
     }
 
     /// <summary>
-    /// Update sucbscription packages
+    /// Update subscription packages
     /// </summary>
 
     [ProducesResponseType(StatusCodes.Status200OK)]

@@ -17,7 +17,7 @@ namespace URLShortner.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.0");
 
-            modelBuilder.Entity("URLShortner.Models.SubscriptionPackage", b =>
+            modelBuilder.Entity("URLShortner.Models.DomainModels.SubscriptionPackage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -41,7 +41,7 @@ namespace URLShortner.Migrations
                     b.ToTable("SubscriptionPackages");
                 });
 
-            modelBuilder.Entity("URLShortner.Models.UrlManagement", b =>
+            modelBuilder.Entity("URLShortner.Models.DomainModels.UrlManagement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -64,7 +64,7 @@ namespace URLShortner.Migrations
                     b.ToTable("Urls");
                 });
 
-            modelBuilder.Entity("URLShortner.Models.User", b =>
+            modelBuilder.Entity("URLShortner.Models.DomainModels.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

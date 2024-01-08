@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using URLShortner.Data;
 using URLShortner.Models;
+using URLShortner.Models.DomainModels;
 using URLShortner.Models.Dtos.UserDtos;
 using URLShortner.Repository.UserRepository;
 using BC = BCrypt.Net.BCrypt;
@@ -80,6 +81,9 @@ public class UserController : ControllerBase
             };
 
             await _userRepository.AddUserAsync(user);
+
+            subscription.TotalSubsciptions += 1;
+            _db.SubscriptionPackages.Update(subscription);
             await _db.SaveChangesAsync();
             apiResponse.IsSuccess = true;
             apiResponse.HttpStatusCode = HttpStatusCode.Created;
