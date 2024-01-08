@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -11,9 +12,15 @@ using URLShortner.Repository.UserRepository;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+// var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+
+var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.XML";
+var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+
 // Add services to the container.
 
-
+builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddResponseCaching();
 builder.Services.AddScoped<IUrlRepository, UrlRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -35,7 +42,7 @@ builder
     });
 
 var key = builder.Configuration.GetValue<string>("ApiSettings:Secret");
-
+string corsPolicyName = "UrlShortner.PolicyName";
 builder
     .Services
     .AddAuthentication(x =>
@@ -52,7 +59,8 @@ builder
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(key)),
             ValidateIssuer = false,
-            ValidateAudience = false
+            ValidateAudience = false,
+            ValidateLifetime = true
         };
     });
 ;
@@ -107,16 +115,35 @@ builder
             {
                 Version = "v1.0",
                 Title = "URL Shortner V1",
-                Description = "3 requests every 30 seconds",
+                Description = "URL SHORTNER",
             }
         );
+
+        options.IncludeXmlComments(xmlPath);
     });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder
+    .Services
+    .AddCors(
+        options =>
+            options.AddPolicy(
+                corsPolicyName,
+                policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()
+            )
+    );
+
 var app = builder.Build();
+
+app.UseCors(builder =>
+{
+    builder.AllowAnyOrigin();
+    builder.AllowAnyMethod();
+    builder.AllowAnyHeader();
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -125,8 +152,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseCors();
 
+
+app.UseCors(corsPolicyName);
 app.UseAuthorization();
 
 app.UseRateLimiter();

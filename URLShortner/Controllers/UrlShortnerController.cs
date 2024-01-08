@@ -3,35 +3,45 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using URLShortner.Data;
 using URLShortner.Models;
 using URLShortner.Models.Dtos;
+using URLShortner.Models.Dtos.SubscriptionDtos;
 using URLShortner.Repository;
 
 namespace URLShortner.Controllers;
 
+/// <summary>
+///
+/// </summary>
 [ApiController]
 [Route("api/shortenurl")]
 public class UrlShortnerController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IUrlRepository _urlRepository;
-    private ApiResponse apiResponse;
+    private ApiResponse _apiResponse;
 
     public UrlShortnerController(ApplicationDbContext db, IUrlRepository urlRepository)
     {
         _db = db;
         _urlRepository = urlRepository;
-        apiResponse = new ApiResponse();
+        _apiResponse = new ApiResponse();
     }
 
-    [HttpPost("CreateShortUrl")]
-    [EnableRateLimiting("sliding")]
+    /// <summary>
+    /// Create shortened url [AUTHENTICATED]
+    /// </summary>
+
+    [HttpPost("createshorturl")]
+    // [EnableRateLimiting("sliding")]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public async Task<IActionResult> CreateShortUrl([FromBody] UrlDto requestDto)
     {
@@ -44,6 +54,18 @@ public class UrlShortnerController : ControllerBase
 
             var identity = HttpContext.User.Identity as ClaimsIdentity;
 
+            var shortUrlExists = await _db.Urls.FirstOrDefaultAsync(
+                s => s.LongUrl == requestDto.Url
+            );
+
+            if (shortUrlExists != null)
+            {
+                _apiResponse.IsSuccess = true;
+                _apiResponse.HttpStatusCode = HttpStatusCode.OK;
+                _apiResponse.SuccessMessage = "Short Url created";
+                _apiResponse.Result = shortUrlExists.Shorturl;
+                return Ok(_apiResponse);
+            }
             IEnumerable<Claim> claims = identity.Claims;
 
             var userId = claims.FirstOrDefault(c => c.Type == "Id").Value;
@@ -65,29 +87,49 @@ public class UrlShortnerController : ControllerBase
             };
 
             await _urlRepository.CreateShortUrl(shortUrl);
-
-            return Ok(sUrl);
+            _apiResponse.IsSuccess = true;
+            _apiResponse.HttpStatusCode = HttpStatusCode.OK;
+            _apiResponse.SuccessMessage = "Short Url created";
+            _apiResponse.Result = sUrl;
+            return Ok(_apiResponse);
         }
         catch (Exception ex)
         {
-            apiResponse.HttpStatusCode = HttpStatusCode.BadRequest;
-            apiResponse.ErrorMessages = new List<string>() { ex.Message.ToString() };
-            return BadRequest(apiResponse);
+            _apiResponse.HttpStatusCode = HttpStatusCode.BadRequest;
+            _apiResponse.ErrorMessages = new List<string>() { ex.Message.ToString() };
+            return BadRequest(_apiResponse);
         }
     }
 
-    [HttpGet(Name = "GetAllUserShortenUrls")]
+    /// <summary>
+    /// Get all user's shortened urls [AUTHENTICATED]
+    /// </summary>
+    [HttpGet(Name = "getallusershortenurls")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    // [Authorize]
     public async Task<IActionResult> GetUserShortenUrls()
     {
         try
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             var userId = identity.Claims.FirstOrDefault(c => c.Type == "Id").Value;
+            var exp = identity.Claims.FirstOrDefault(c => c.Type == "exp").Value;
+
+            var time = long.Parse(exp);
+            var expirationDateTime = DateTimeOffset.FromUnixTimeSeconds(time).UtcDateTime;
+            if (expirationDateTime < DateTime.Now)
+            {
+                _apiResponse.ErrorMessages = new List<string>()
+                {
+                    "Session Token Expired",
+                    expirationDateTime.ToString()
+                };
+                _apiResponse.HttpStatusCode = HttpStatusCode.Forbidden;
+
+                return BadRequest(_apiResponse);
+            }
             var user = await _db.Urls
                 .Where(u => u.UserId == userId)
                 .Select(
@@ -103,23 +145,26 @@ public class UrlShortnerController : ControllerBase
 
             if (user == null)
             {
-                apiResponse.ErrorMessages = new List<string>() { "User has no converted Urls" };
-                apiResponse.HttpStatusCode = HttpStatusCode.NotFound;
+                _apiResponse.ErrorMessages = new List<string>() { "User has no converted Urls" };
+                _apiResponse.HttpStatusCode = HttpStatusCode.NotFound;
 
-                return BadRequest(apiResponse);
+                return BadRequest(_apiResponse);
             }
 
-            apiResponse.HttpStatusCode = HttpStatusCode.OK;
-            apiResponse.Result = user;
-            apiResponse.SuccessMessage = "User urls retrieved";
-            apiResponse.IsSuccess = true;
-            return Ok(apiResponse);
+            _apiResponse.HttpStatusCode = HttpStatusCode.OK;
+            _apiResponse.Result = user;
+            _apiResponse.SuccessMessage = "User urls retrieved";
+            _apiResponse.IsSuccess = true;
+            return Ok(_apiResponse);
         }
         catch (Exception ex)
         {
-            apiResponse.HttpStatusCode = HttpStatusCode.BadRequest;
-            apiResponse.ErrorMessages = new List<string>() { ex.Message.ToString() };
-            return BadRequest(apiResponse);
+            _apiResponse.HttpStatusCode = HttpStatusCode.BadRequest;
+            _apiResponse.ErrorMessages = new List<string>() { ex.Message.ToString() };
+            return BadRequest(_apiResponse);
         }
     }
+
+
+    
 }

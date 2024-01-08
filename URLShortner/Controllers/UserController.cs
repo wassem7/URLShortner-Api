@@ -1,5 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Mime;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
@@ -36,10 +37,15 @@ public class UserController : ControllerBase
         _configuration = configuration;
     }
 
-    [HttpPost("registeruser")]
+    /// <summary>
+    /// Register user
+    /// </summary>
+
+    [Produces(MediaTypeNames.Application.Json)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [AllowAnonymous]
+    [HttpPost("registeruser")]
     public async Task<ActionResult<ApiResponse>> RegisterUser(
         [FromBody] RegisterUserRequestDto registerUserRequestDto
     )
@@ -47,7 +53,7 @@ public class UserController : ControllerBase
         try
         {
             var userExists = await _userRepository.GetUserAsync(
-                u => u.Username == registerUserRequestDto.UserName
+                u => u.Username == registerUserRequestDto.Username
             );
 
             if (userExists != null)
@@ -61,20 +67,26 @@ public class UserController : ControllerBase
                 return BadRequest(apiResponse);
             }
 
+            var subscription = await _db.SubscriptionPackages.FirstOrDefaultAsync(
+                s => s.Name.ToLower() == "free"
+            );
+
             var user = new User()
             {
-                Username = registerUserRequestDto.UserName,
-                Password = BC.HashPassword(registerUserRequestDto.Password)
+                Username = registerUserRequestDto.Username,
+                Password = BC.HashPassword(registerUserRequestDto.Password),
+                Subscription = subscription.Name,
+                SubscriptionId = subscription.Id
             };
 
             await _userRepository.AddUserAsync(user);
+            await _db.SaveChangesAsync();
             apiResponse.IsSuccess = true;
             apiResponse.HttpStatusCode = HttpStatusCode.Created;
-            apiResponse.Result = new User()
+            apiResponse.Result = new RegisterUserResponseDto()
             {
                 Username = user.Username,
-                Password = "censored",
-                Id = user.Id
+                Subscription = user.Subscription
             };
             apiResponse.SuccessMessage = "User created successfully";
             return Ok(apiResponse);
@@ -87,6 +99,9 @@ public class UserController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Login user. Token expires in 24 hours
+    /// </summary>
     [HttpPost("loginuser")]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -138,11 +153,11 @@ public class UserController : ControllerBase
                         new Claim("Id", user.Id.ToString())
                     }
                 ),
-                Expires = DateTime.UtcNow.AddDays(4),
+                Expires = DateTime.UtcNow.AddDays(2),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256Signature
-                )
+                ),
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
@@ -166,8 +181,12 @@ public class UserController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// All users
+    /// </summary>
+    /// <returns></returns>
     [HttpGet("AllUsers")]
-    [ResponseCache(Duration = 30)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> GetAllUsers()
     {
         try

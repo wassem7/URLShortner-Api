@@ -11,4 +11,6 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<UrlManagement> Urls { get; set; }
     public DbSet<User> Users { get; set; }
+
+    public DbSet<SubscriptionPackage> SubscriptionPackages { get; set; }
 }
